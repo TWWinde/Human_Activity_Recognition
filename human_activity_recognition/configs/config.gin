@@ -1,0 +1,43 @@
+# Dataset
+load.name = "hapt"
+load.batch_size = 32
+load.data_dir = "/home/data/human_activity_recognition/data_tfrecords"
+prepare.caching = False
+
+# TFRecords
+TFRecords.window_length = 250
+TFRecords.window_shift = 125
+
+# Training
+Trainer.total_steps = 1500
+Trainer.log_interval = 20
+Trainer.ckpt_interval = 20
+Trainer.acc=0
+
+# Model
+# lstm
+lstm.n_classes = 12
+lstm.window_length = 250
+lstm.rnn_num = 4
+lstm.rnn_units = 32
+lstm.rnn_dropout = 0.3
+lstm.dense_num = 2
+lstm.dense_units = 128
+lstm.dense_dropout = 0.4
+lstm.kernel_initializer = "glorot_uniform"
+lstm.bi_direction = False
+
+# gru
+gru.n_classes = 12
+gru.window_length = 250
+gru.rnn_num = 3
+gru.rnn_units = 64
+gru.rnn_dropout = 0.1
+gru.dense_num = 1
+gru.dense_units = 64
+gru.dense_dropout = 0.3
+gru.kernel_initializer = "glorot_uniform"
+gru.bi_direction = False
+
+# Evaluation
+Eval.exp_user = (2, 1)
