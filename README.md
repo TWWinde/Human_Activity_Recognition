@@ -48,8 +48,8 @@ The GRU model finally achieved an accuracy of 95.82%, while the LSTM model final
 |  GRU  |       97.34        |      82.80       |       95.82       |    94,412    |
 
 ### LSTM
-The model uses the lstm layer as the rnn layer. It is run with `python3 main.py --model_name lstm`.
-The optimal parameters obtained by manual optimization are commented in the config-file.
+The model uses the lstm layer as the rnn layer. The optimal parameters obtained by manual optimization are commented in the config-file.
+
 ### GRU
 The model uses the gru layer as the rnn layer. It is run with `python3 main.py --model_name gru`.
 The optimal parameters obtained by manual optimization are commented in the config-file.
@@ -57,6 +57,7 @@ The optimal parameters obtained by manual optimization are commented in the conf
 ### Confusion matrix
 In the evaluation, the results of the trained model for the test set are presented as a confusion matrix. The output will be stored in the output of the trained model.
 Below is the confusion matrix of the GRU model
+
 ### Confusion matrix Example 
 ![cm_gru](https://media.github.tik.uni-stuttgart.de/user/3535/files/f6061826-83a8-4653-bdba-c1bb039aeca2)
 
