@@ -3,7 +3,7 @@ This repository contains the code for training and evaluation of Deep Learning L
 
 ## Links
 
-* [Project Poster](https://github.com/TWWinde/Diabetic_Retinopathy/blob/main/Diabetic_Retinopathy_Detection_based_on_Deep_Learning.pdf)
+* [Project Poster](https://github.com/TWWinde/Human_Activity_Recognition/blob/main/human_activity_recognition/Abgabe/Poster_Team08_HAR.pdf)
   
 ## Train and Evaluation
 
