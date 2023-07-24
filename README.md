@@ -9,7 +9,7 @@ This repository contains the code for training and evaluation of Deep Learning L
 
 ### 1. Datasets
 
-Pre-process the [*HAPT Dataset*](https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones) using the code-base at `Input_pipeline/` (https://github.com/TWWinde/Diabetic_Retinopathy/tree/main/diabetic_retinopathy/Input_pipeline).
+Pre-process the [*HAPT Dataset*](https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones) using the code-base at `Input_pipeline/` (https://github.com/TWWinde/Human_Activity_Recognition/tree/main/human_activity_recognition/input_pipeline).
 1. Edit the paths defined at the config script to point to the actual data paths. 
 2. Run the script using `python data_prepare.py` to generate the needed TFrecord files.
    
