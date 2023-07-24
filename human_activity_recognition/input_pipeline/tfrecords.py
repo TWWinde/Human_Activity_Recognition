@@ -83,7 +83,7 @@ class TFRecords:
             window_data = data_format.iloc[index: (index + self.window_length)].values
 
             label, count = mode(window_data[:, 6]).mode[0], mode(window_data[:, 6]).count[0]
-            if label >= 7:  # 过渡性动作
+            if label >= 7: 
                 if (count / self.window_length) <= 0.45:
                     label = 0
             else:
