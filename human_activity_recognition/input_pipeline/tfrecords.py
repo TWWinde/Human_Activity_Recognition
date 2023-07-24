@@ -203,10 +203,4 @@ class TFRecords:
 
 
 
-if __name__ == '__main__':
-    '''
-    data_dir = " /home/data/HAPT_dataset/RawData/"
-    records_dir = "/home/data/human_activity_recognition/data_tfrecords/"
-    window_length_and_shift = (250, 125)
-    create_tfrecords(data_dir=data_dir, records_dir=records_dir, window_length_and_shift=window_length_and_shift)
-    '''
+TFRecords().generate_tfrecords(data_dir=data_dir, records_dir=records_dir)
