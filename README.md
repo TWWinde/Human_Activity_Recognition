@@ -1,3 +1,34 @@
+# Human Activity Recognition
+This repository contains the code for training and evaluation of Deep Learning Lab work.
+
+## Links
+
+* [Project Poster](https://github.com/TWWinde/Diabetic_Retinopathy/blob/main/Diabetic_Retinopathy_Detection_based_on_Deep_Learning.pdf)
+  
+## Train and Evaluation
+
+### 1. Datasets
+
+Pre-process the [*IDRID Dataset*](https://ieee-dataport.org/open-access/indian-diabetic-retinopathy-image-dataset-idrid) using the code-base at `Input_pipeline/` (https://github.com/TWWinde/Diabetic_Retinopathy/tree/main/diabetic_retinopathy/Input_pipeline).
+1. Edit the paths defined at the config script to point to the actual data paths. 
+2. Run the script using `python data_prepare.py` to generate the needed TFrecord files.
+   
+       cd /Input_pipline
+   
+       python data_prepare.py
+   
+After the dataset preprocessing procedures have been performed, we can move on to the next steps.
+
+### 2. Prerequisites
+
+This codebase should run on most standard Linux systems. We specifically used Ubuntu 
+
+Please install the following prerequisites manually (as well as their dependencies), by following the instructions found below:
+* Tensorflow 
+
+The remaining Python package dependencies can be installed by running:
+
+       pip3 install --user --upgrade -r requirements.txt
 
 
 
