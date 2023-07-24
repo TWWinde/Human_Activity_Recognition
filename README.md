@@ -31,12 +31,11 @@ The remaining Python package dependencies can be installed by running:
        pip3 install --user --upgrade -r requirements.txt
 
 
+### 3. Training,Evalutions and Hyperparameter Optimization
 
+Run the all-in-one example bash script with:
 
-# How to run the code
-
-- Change  `batch.sh` to `python3 main.py` Run `main.py` to train or evaluation. Run `main.py` ,it will process the image and serialize images and labels into the TFRecord format and then training the model automatically.      
-- Change  `batch.sh` to `python3 tune.py`. Run `tune.py` to do hyperparameter optimization. 
+      bash train_test.bash
 
 
 
