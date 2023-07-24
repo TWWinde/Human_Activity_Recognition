@@ -27,20 +27,17 @@ def histogram(feature, label):
 
 
 def oversampling_data(labels, features):
-    # oversampling 确保训练数据集是平衡的
+    # oversampling 
 
     labels_oversampled = np.empty((0, labels.shape[1]))
-    features_oversampled = np.empty((0, features.shape[1], features.shape[2]))  # shape (0,1,2) 定义了返回数组的形状
+    features_oversampled = np.empty((0, features.shape[1], features.shape[2]))  # shape (0,1,2) 
 
-    # 去除其中重复的元素,并按元素由小到大返回一个新的无元素重复的元组或者列表,return_counts=true,返回去重数组中的元素在原数组中的出现次数
     activities, activity_counts = np.unique(labels, return_counts=True)
 
-    # 获得过渡和静态/动态活动的最大计数
     max_activity = np.max(activity_counts[1:7])
     max_transition_activity = np.max(activity_counts[7:])
 
-    # 获得每个活动的索引，并将其重新取样到最大尺寸
-    # remove zero 从索引中删除零
+    # remove zero
     for activity in activities:
         activity_indices = np.where(labels == activity)[0]
         if activity < 7:
@@ -55,8 +52,7 @@ def oversampling_data(labels, features):
 
 
 def serialize(labels, features):
-    # 序列化数据
-    # Create a tf.train.Example, ready to write to the file 创建一个tf.train.Example，准备写进文件
+    # Create a tf.train.Example, ready to write to the file
 
     labels_of_bytes = tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(labels).numpy()]))
     feature_of_bytes = tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(features).numpy()]))
@@ -77,17 +73,15 @@ class TFRecords:
 
     def define_window(self, data_format):
         # S2L, delete unavailable data
-        # Creating the basic window format 创建基础的窗口格式
+        # Creating the basic window format 
 
         labels_list = []
         features_list = []
 
-        # delete first 5s and last 5s data. 删除前5秒和最后5秒的数据，将第一个索引设为window_length
+        # delete first 5s and last 5s data. 
         for index in range(self.window_length, len(data_format) - self.window_length, self.window_shift):
             window_data = data_format.iloc[index: (index + self.window_length)].values
 
-            # 如果超过40%的序列是过渡性的，就给它贴上过渡活动的标签, 如果超过85%的序列是正常的，则分配正常活动的标签
-            # 否则赋值为0，之后删除
             label, count = mode(window_data[:, 6]).mode[0], mode(window_data[:, 6]).count[0]
             if label >= 7:  # 过渡性动作
                 if (count / self.window_length) <= 0.45:
@@ -126,7 +120,6 @@ class TFRecords:
 
         for index, (exp, user, act, sco, eco) in labels.iterrows():
 
-            # 只有在需要时才加载一个新的文件，否则保留已打开的文件的内容
             if (exp != exp_now) or (user != user_now):
                 exp_now, user_now = exp, user
 
@@ -137,7 +130,7 @@ class TFRecords:
                 gyro_data = pd.read_csv(
                     os.path.join(data_dir, f"gyro_exp{str(exp_now).zfill(2)}_user{str(user_now).zfill(2)}.txt"),
                     sep=" ", header=None)
-                sensor_data = pd.concat([acc_data, gyro_data], axis=1)  # 横向表拼接 行对齐
+                sensor_data = pd.concat([acc_data, gyro_data], axis=1) 
                 sensor_data.columns = ["acc_1", "acc_2", "acc_3", "gyro_1", "gyro_2", "gyro_3"]
 
                 # Initialization
