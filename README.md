@@ -15,7 +15,7 @@ Pre-process the [*HAPT Dataset*](https://archive.ics.uci.edu/dataset/240/human+a
    
        cd /Input_pipline
    
-       python data_prepare.py
+       python tfrecords.py
    
 After the dataset preprocessing procedures have been performed, we can move on to the next steps.
 
