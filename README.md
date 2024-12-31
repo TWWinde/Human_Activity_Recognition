@@ -59,7 +59,7 @@ In the evaluation, the results of the trained model for the test set are present
 Below is the confusion matrix of the GRU model
 
 ### Confusion matrix Example 
-![cm_gru](https://media.github.tik.uni-stuttgart.de/user/3535/files/f6061826-83a8-4653-bdba-c1bb039aeca2)
+![cm_gru](https://github.com/TWWinde/Human_Activity_Recognition/blob/main/human_activity_recognition/Abgabe/image/cm_gru.png)
 
 ### Visualization
 After the evaluation, a selected file will be visualized. The file to be visualized can be set in *config.gin* by editing the parameter `Visualization.exp_user = (2, 1)`.
