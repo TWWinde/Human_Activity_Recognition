@@ -69,7 +69,8 @@ The output will be stored in the output of the model that has been trained.
 The visualization contains the ground truth and prediction of the accelerometer and gyroscope signals and their labels. Below is an example of a trained GRU model.
 
 #### Visualization Example 
-<img width="703" alt="visu" src="[](https://github.com/TWWinde/Human_Activity_Recognition/blob/main/human_activity_recognition/Abgabe/image/visu.png)">
+![visualization](https://github.com/TWWinde/Human_Activity_Recognition/blob/main/human_activity_recognition/Abgabe/image/visu.png)
+
 
 
 ### Conclusions
