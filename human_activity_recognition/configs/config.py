@@ -6,7 +6,7 @@ def get_config():
     parser = argparse.ArgumentParser(description="HAR Model Configuration")
 
     # 主要参数
-    parser.add_argument('--data_root_dir', type=str, default="/Users/tangwenwu/Downloads/HAPT Data Set")
+    parser.add_argument('--data_root_dir', type=str, default="./data")
     parser.add_argument('--split', type=str, default="train")
     parser.add_argument('--window_size', type=int, default=128)
     parser.add_argument('--step_size', type=int, default=64)
