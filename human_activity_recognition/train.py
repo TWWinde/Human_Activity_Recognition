@@ -1,161 +1,129 @@
-import datetime
 import os
-import gin
-import tensorflow as tf
+import datetime
 import logging
+if not logging.getLogger().hasHandlers():  # 避免重复初始化
+    logging.basicConfig(level=logging.INFO)
 
+logging.basicConfig(level=logging.INFO)
+import torch
+import torch.nn as nn
+from tqdm import tqdm
 
-@gin.configurable
-class Trainer(object):
-    def __init__(self, model, ds_train, ds_val, run_paths,
-                 total_steps, log_interval, ckpt_interval, acc, loss_weight=1, acc_weight=1):
+class Trainer:
+    def __init__(self, config, model, train_loader, val_loader, device="mps" if torch.cuda.is_available() else "cpu"):
+        logging.info(f"Starting training...")
 
-        logging.info(f'All relevant data from {run_paths["path_model_id"]}')
+        # 设备
+        self.device = device
+        self.model = model.to(self.device)
 
-        # Summary Writer
+        # 数据加载
+        self.train_loader = train_loader
+        self.val_loader = val_loader
 
+        # 训练参数
+        self.total_steps = config.total_steps
+        self.epoch_steps = config.n_epochs
+        self.log_interval = config.log_interval
+        self.ckpt_interval = config.ckpt_interval
+        self.loss_weight = config.loss_weight
+        self.acc_weight = config.acc_weight
+
+        # 优化器 & 损失函数
+        self.loss_object = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=config.learning_rate)
+
+        # TensorBoard & Logging
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        current_dir = os.path.dirname(__file__)
-        tensorboard_log_dir = os.path.join(current_dir, 'logs')
-        log_dir = os.path.join(tensorboard_log_dir, current_time)
-        logging.info(f"Tensorboard output will be stored in: {log_dir}")
-        self.train_log_dir = os.path.join(log_dir, 'train')
-        self.val_log_dir = os.path.join(log_dir, 'validation')
+        log_dir = os.path.join(os.path.dirname(__file__), "logs", current_time)
+        logging.info(f"TensorBoard logs will be stored in: {log_dir}")
 
-        self.train_summary_writer = tf.summary.create_file_writer(self.train_log_dir)
-        self.val_summary_writer = tf.summary.create_file_writer(self.val_log_dir)
+        # Checkpoint 目录
+        self.checkpoint_dir = config.checkpoint_paths
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        logging.info(f"Checkpoints will be stored in: {self.checkpoint_dir}")
 
-        # Loss objective
-        self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
-        # self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-        # self.optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.001)
-        lr_scheduler = tf.keras.optimizers.schedules.CosineDecay(initial_learning_rate=0.001,
-                                                                 decay_steps=1000,
-                                                                 alpha=0.1)
-        self.optimizer = tf.keras.optimizers.Adam(lr_scheduler)
+        # 记录最佳模型
+        self.best_val_accuracy = 0.0
 
-        # Metrics
-        self.train_loss = tf.keras.metrics.Mean(name='train_loss')
-        self.train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
-
-        self.val_loss = tf.keras.metrics.Mean(name='val_loss')
-        self.val_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='val_accuracy')
-
-        self.model = model
-        self.ds_train = ds_train
-        self.ds_val = ds_val
-        self.run_paths = run_paths
-        self.total_steps = total_steps
-        self.log_interval = log_interval
-        self.ckpt_interval = ckpt_interval
-        self.loss_weight = loss_weight
-        self.acc_weight = acc_weight
-        self.acc = acc
-
-        # Checkpoint Manager
-        self.checkpoint = tf.train.Checkpoint(step=tf.Variable(0), model=self.model, optimizer=self.optimizer)
-        self.manager = tf.train.CheckpointManager(self.checkpoint, directory=run_paths["path_ckpts_train"],
-                                                  max_to_keep=3)
-        logging.info(f"All checkpoints will be stored in: {run_paths['path_ckpts_train']}")
-
-        # ...
-
-    @tf.function
     def train_step(self, features, labels):
-        loss_weight_vector = tf.squeeze(tf.where(labels > 5, self.loss_weight, 1))
-        acc_weight_vector = tf.squeeze(tf.where(labels > 5, self.acc_weight, 1))
-        with tf.GradientTape() as tape:
-            # training=True is only needed if there are layers with different
-            # behavior during training versus inference (e.g. Dropout).
-            predictions = self.model(features, training=True)
-            loss = self.loss_object(labels, predictions, sample_weight=loss_weight_vector)
-        gradients = tape.gradient(loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-        self.train_loss(loss)
-        self.train_accuracy.update_state(labels, predictions, sample_weight=acc_weight_vector)
+        """单步训练"""
+        self.model.train()
+        features, labels = features.to(self.device), labels.to(self.device)
 
-    @tf.function
+        self.optimizer.zero_grad()
+        predictions = self.model(features)
+
+        loss = self.loss_object(predictions, labels)
+        loss.backward()
+        self.optimizer.step()
+
+        # 计算准确率
+        _, predicted = torch.max(predictions, 1)
+        accuracy = (predicted == labels).float().mean().item()
+
+        return loss.item(), accuracy
+
     def val_step(self, features, labels):
-        loss_weight_vector = tf.squeeze(tf.where(labels > 5, self.loss_weight, 1))
-        acc_weight_vector = tf.squeeze(tf.where(labels > 5, self.acc_weight, 1))
-        # training=False is only needed if there are layers with different
-        # behavior during training versus inference (e.g. Dropout).
-        predictions = self.model(features, training=False)
-        t_loss = self.loss_object(labels, predictions, sample_weight=loss_weight_vector)
-        self.val_loss(t_loss)
-        self.val_accuracy.update_state(labels, predictions, sample_weight=acc_weight_vector)
+        """单步验证"""
+        self.model.eval()
+        with torch.no_grad():
+            features, labels = features.to(self.device), labels.to(self.device)
+            predictions = self.model(features)
 
-    def write_scalar_summary(self, step):
-        """ Write scalar summary to tensorboard """
+            loss = self.loss_object(predictions, labels)
+            _, predicted = torch.max(predictions, 1)
+            accuracy = (predicted == labels).float().mean().item()
 
-        with self.train_summary_writer.as_default():
-            tf.summary.scalar('loss', self.train_loss.result(), step=step)
-            tf.summary.scalar('accuracy', self.train_accuracy.result(), step=step)
-
-        with self.val_summary_writer.as_default():
-            tf.summary.scalar('loss', self.val_loss.result(), step=step)
-            tf.summary.scalar('accuracy', self.val_accuracy.result(), step=step)
+        return loss.item(), accuracy
 
     def train(self):
-        logging.info(self.model.summary())
-        logging.info('\n================ Starting Training ================')
-        self.acc = 0
+        """完整训练循环"""
+        logging.info("\n================ Starting Training ================")
 
-        for idx, (features, labels) in enumerate(self.ds_train):
-            step = idx + 1
-            self.train_step(features, labels)
-            # logging.info('\nThe {} step is now being implemented.'.format(step))
+        step = 0
+        for epoch in range(1, self.epoch_steps + 1):
+            train_loss, train_accuracy = 0.0, 0.0
 
-            if step % self.log_interval == 0:
-                # Reset test metrics
-                self.val_loss.reset_states()
-                self.val_accuracy.reset_states()
+            # 遍历训练集
+            for step, (features, labels) in enumerate(tqdm(self.train_loader, total=self.total_steps), 1):
+                step += 1
+                loss, accuracy = self.train_step(features, labels)
+                train_loss += loss
+                train_accuracy += accuracy
 
-                for val_features, val_labels in self.ds_val:
-                    self.val_step(val_features, val_labels)
+                # 日志记录
+                if step % self.log_interval == 0:
+                    val_loss, val_accuracy = 0.0, 0.0
+                    for val_features, val_labels in self.val_loader:
+                        v_loss, v_accuracy = self.val_step(val_features, val_labels)
+                        val_loss += v_loss
+                        val_accuracy += v_accuracy
 
-                template = 'Step {}, Loss: {}, Accuracy: {:.2f}%, Test Loss: {}, Validation Accuracy: {:.2f}%'
-                logging.info(template.format(step,
-                                             self.train_loss.result(),
-                                             self.train_accuracy.result() * 100,
-                                             self.val_loss.result(),
-                                             self.val_accuracy.result() * 100))
+                    val_loss /= len(self.val_loader)
+                    val_accuracy /= len(self.val_loader)
 
-                # Write summary to tensorboard
-                self.write_scalar_summary(step)
+                    logging.info(f"Epoch {epoch}, Step {step}, Train Loss: {train_loss/self.log_interval:.4f}, Train Accuracy: {train_accuracy/self.log_interval:.2f}%, Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%")
 
-                # Reset train metrics
-                self.train_loss.reset_states()
-                self.train_accuracy.reset_states()
+                    # 重置训练损失 & 准确率
+                    train_loss, train_accuracy = 0.0, 0.0
 
-                yield self.val_accuracy.result().numpy()
+                    # 保存最优模型
+                    if val_accuracy > self.best_val_accuracy:
+                        self.best_val_accuracy = val_accuracy
+                        ckpt_path = os.path.join(self.checkpoint_dir, "best_model.pth")
+                        torch.save(self.model.state_dict(), ckpt_path)
+                        logging.info(f"Best model saved to {ckpt_path}")
 
-            # Save checkpoint
-            if step % self.ckpt_interval == 0:
-                if self.acc < self.val_accuracy.result():
-                    self.acc = self.val_accuracy.result()
-                    logging.info(f'Saving checkpoint to {self.run_paths["path_ckpts_train"]}.')
-                    path = self.manager.save()
-                    print("model saved to %s" % path)
+                # 定期保存 Checkpoint
+                if step % self.ckpt_interval == 0:
+                    ckpt_path = os.path.join(self.checkpoint_dir, f"checkpoint_{step}.pth")
+                    torch.save(self.model.state_dict(), ckpt_path)
+                    logging.info(f"Checkpoint saved at {ckpt_path}")
 
-            if step % self.total_steps == 0:
-                logging.info(f'Finished training after {step} steps.')
+        # 训练结束，保存最终模型
+        final_ckpt_path = os.path.join(self.checkpoint_dir, "final_model.pth")
+        torch.save(self.model.state_dict(), final_ckpt_path)
+        logging.info(f"Final model saved to {final_ckpt_path}")
 
-                # Save final checkpoint
-                path = self.checkpoint.save(self.run_paths["path_ckpts_train"])
-                print("final model saved to %s" % path)
-
-                return self.val_accuracy.result().numpy()
-
-        template = 'Step {}, Loss: {}, Accuracy: {}, Validation Loss: {}, Validation Accuracy: {}'
-        logging.info(template.format(step,
-                                     self.train_loss.result(),
-                                     self.train_accuracy.result() * 100,
-                                     self.val_loss.result(),
-                                     self.val_accuracy.result() * 100))
-
-        logging.info('\n================ Finished Training ================')
-
-
-class Example:
-    pass
+        logging.info("\n================ Finished Training ================")
