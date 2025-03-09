@@ -77,7 +77,6 @@ def get_dataloaders(data_dir, batch_size=64, seq_length=100, stride=50):
     加载训练集和测试集数据，进行数据划分，并对少数类别进行过采样。
     """
 
-
     train_dataset = HumanActivityDataset(data_dir, seq_length, stride, mode="train")
     test_dataset = HumanActivityDataset(data_dir, seq_length, stride, mode="test")
 

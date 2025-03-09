@@ -62,7 +62,7 @@ class LSTM(nn.Module):
             x = layer(x)
         
         x = self.output_layer(x)
-        return F.softmax(x, dim=1)
+        return x #F.softmax(x, dim=1)
 
 
 

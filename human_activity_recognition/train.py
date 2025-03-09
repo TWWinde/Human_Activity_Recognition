@@ -10,11 +10,11 @@ import torch.nn as nn
 from tqdm import tqdm
 
 class Trainer:
-    def __init__(self, config, model, train_loader, val_loader, device="mps" if torch.cuda.is_available() else "cpu"):
+    def __init__(self, config, model, train_loader, val_loader, device=None):
         logging.info(f"Starting training...")
 
         # 设备
-        self.device = device
+        self.device = device if device else ("mps" if torch.backends.mps.is_available() else "cpu")
         self.model = model.to(self.device)
 
         # 数据加载
@@ -31,7 +31,7 @@ class Trainer:
 
         # 优化器 & 损失函数
         self.loss_object = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=config.learning_rate)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=config.learning_rate)
 
         # TensorBoard & Logging
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -45,6 +45,50 @@ class Trainer:
 
         # 记录最佳模型
         self.best_val_accuracy = 0.0
+        self.start_epoch = 1
+        self.start_step = 0
+
+        # 尝试加载 checkpoint
+        self._load_checkpoint()
+
+    def _save_checkpoint(self, epoch, step, best=False):
+        """保存 checkpoint"""
+        checkpoint = {
+            'epoch': epoch,
+            'step': step,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'best_val_accuracy': self.best_val_accuracy
+        }
+
+        filename = "best_model.pth" if best else f"checkpoint_{step}.pth"
+        save_path = os.path.join(self.checkpoint_dir, filename)
+        torch.save(checkpoint, save_path)
+        logging.info(f"✅ Checkpoint saved: {save_path}")
+
+    def _load_checkpoint(self):
+        """尝试加载已保存的 checkpoint"""
+        best_model_path = os.path.join(self.checkpoint_dir, "best_model.pth")
+        last_checkpoint_path = os.path.join(self.checkpoint_dir, "last_checkpoint.pth")
+
+        if os.path.exists(last_checkpoint_path):
+            checkpoint_path = last_checkpoint_path
+        elif os.path.exists(best_model_path):
+            checkpoint_path = best_model_path
+        else:
+            logging.info("⚠️ No checkpoint found. Starting fresh!")
+            return
+
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        self.start_epoch = checkpoint.get('epoch', 1)
+        self.start_step = checkpoint.get('step', 0)
+        self.best_val_accuracy = checkpoint.get('best_val_accuracy', 0.0)
+
+        logging.info(f"✅ Loaded checkpoint from {checkpoint_path}. Resuming from epoch {self.start_epoch}, step {self.start_step}")
 
     def train_step(self, features, labels):
         """单步训练"""
@@ -81,12 +125,11 @@ class Trainer:
         """完整训练循环"""
         logging.info("\n================ Starting Training ================")
 
-        step = 0
-        for epoch in range(1, self.epoch_steps + 1):
+        step = self.start_step
+        for epoch in range(self.start_epoch, self.epoch_steps + 1):
             train_loss, train_accuracy = 0.0, 0.0
 
-            # 遍历训练集
-            for step, (features, labels) in enumerate(tqdm(self.train_loader, total=self.total_steps), 1):
+            for features, labels in self.train_loader:
                 step += 1
                 loss, accuracy = self.train_step(features, labels)
                 train_loss += loss
@@ -103,7 +146,11 @@ class Trainer:
                     val_loss /= len(self.val_loader)
                     val_accuracy /= len(self.val_loader)
 
-                    logging.info(f"Epoch {epoch}, Step {step}, Train Loss: {train_loss/self.log_interval:.4f}, Train Accuracy: {train_accuracy/self.log_interval:.2f}%, Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.2f}%")
+                    logging.info(f"Epoch {epoch}, Step {step}, "
+                                 f"Train Loss: {train_loss / self.log_interval:.4f}, "
+                                 f"Train Accuracy: {train_accuracy / self.log_interval:.2f}%, "
+                                 f"Val Loss: {val_loss:.4f}, "
+                                 f"Val Accuracy: {val_accuracy:.2f}%")
 
                     # 重置训练损失 & 准确率
                     train_loss, train_accuracy = 0.0, 0.0
@@ -111,19 +158,19 @@ class Trainer:
                     # 保存最优模型
                     if val_accuracy > self.best_val_accuracy:
                         self.best_val_accuracy = val_accuracy
-                        ckpt_path = os.path.join(self.checkpoint_dir, "best_model.pth")
-                        torch.save(self.model.state_dict(), ckpt_path)
-                        logging.info(f"Best model saved to {ckpt_path}")
+                        self._save_checkpoint(epoch, step, best=True)
 
-                # 定期保存 Checkpoint
+                # 定期保存 checkpoint
                 if step % self.ckpt_interval == 0:
-                    ckpt_path = os.path.join(self.checkpoint_dir, f"checkpoint_{step}.pth")
-                    torch.save(self.model.state_dict(), ckpt_path)
-                    logging.info(f"Checkpoint saved at {ckpt_path}")
+                    self._save_checkpoint(epoch, step, best=False)
+                    torch.save({
+                        'epoch': epoch,
+                        'step': step,
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'best_val_accuracy': self.best_val_accuracy
+                    }, os.path.join(self.checkpoint_dir, "last_checkpoint.pth"))
 
-        # 训练结束，保存最终模型
-        final_ckpt_path = os.path.join(self.checkpoint_dir, "final_model.pth")
-        torch.save(self.model.state_dict(), final_ckpt_path)
-        logging.info(f"Final model saved to {final_ckpt_path}")
-
+        # 训练结束保存最终模型
+        self._save_checkpoint(self.epoch_steps, step, best=False)
         logging.info("\n================ Finished Training ================")

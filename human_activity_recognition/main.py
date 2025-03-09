@@ -13,7 +13,7 @@ def main():
     print("MPS Available:", torch.backends.mps.is_available())
     print("MPS Built:", torch.backends.mps.is_built())
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    logging.info("Device", device)
+    logging.info("Device: {}".format(device))
     config = get_config()
     # setup pipeline
     dataset = HumanActivityDataset(data_dir = config.data_root_dir, seq_length=config.window_size, stride=config.step_size)
