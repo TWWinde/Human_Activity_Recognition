@@ -1,78 +1,63 @@
-import gin
 import logging
-from absl import app, flags
-import tensorflow as tf
+logging.basicConfig(level=logging.INFO)
 from train import Trainer
-from input_pipeline.datasets import load
-from utilss import utils_params, utils_misc
-from models.model import lstm, gru
-from evaluation.metrics import confusionmatrix
-from evaluation.eval import Eval
-from input_pipeline.tfrecords import TFRecords
+from models.model import LSTM, GRU
+from input_pipeline.dataloader import HumanActivityDataset,get_dataloaders, HumanActivityDataset_json
+from configs.config import get_config
+import torch
+from torch.utils.data import random_split, Dataset, DataLoader
 
-
-parser = argparse.ArgumentParser(description='Train model')
-parser.add_argument('--model', choices= ['lstm', 'gru'], default = 'lstm' help='choose model')
-parser.add_argument('--mode', choices=['train','test'], default = 'train', help='train or test')
-parser.add_argument('--evaluation', choices=['evaluate', 'confusionmatrix', 'visu.plot_visu'], default = 'evaluate', help='evaluation methods')
-parser.add_argument('--checkpoint-file', type=str, default='./ckpts/',
-                    help='Path to checkpoint.')
-
-args = parser.parse_args()
-
-
-
-@gin.configurable
-def main(argv):
-   
-
-    # generate folder structures
-    run_paths = utils_params.gen_run_folder()
-
-    # set loggers
-    utils_misc.set_loggers(run_paths['path_logs_train'], logging.INFO)
-
-    # gin-config
-    gin.parse_config_files_and_bindings(['configs/config.gin'], [])
-    utils_params.save_config(run_paths['path_gin'], gin.config_str())
-
+def main():
+    print("PyTorch Version:", torch.__version__)
+    print("CUDA Available:", torch.cuda.is_available())
+    print("MPS Available:", torch.backends.mps.is_available())
+    print("MPS Built:", torch.backends.mps.is_built())
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    logging.info("Device: {}".format(device))
+    config = get_config()
     # setup pipeline
-    ds_train, ds_val, ds_test = load()
+    #dataset = HumanActivityDataset(data_dir = config.data_root_dir, seq_length=config.window_size, stride=config.step_size)
+    #train_loader, test_loader = get_dataloaders(data_dir=config.data_root_dir, batch_size=config.batch_size, seq_length=config.window_size, stride=config.step_size)
 
-    if args.model == 'lstm':
-        model = lstm()
-    elif args.model == 'gru':
-        model = gru()
+    dataset = HumanActivityDataset_json(data_dir="/Users/tangwenwu/Documents/motion_data.json", seq_length=64, stride=32, mode='train')
+    total_size = len(dataset)
+    train_size = int(0.9 * total_size)  # 80% 做训练
+    test_size = total_size - train_size
+
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+    # 分别创建 DataLoader
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+
+    logging.info("Data loaded")
+
+    if config.model == 'lstm':
+        model = LSTM(
+        input_size=config.input_size,
+        n_classes=config.n_classes,
+        window_length=config.window_length,
+        rnn_units=config.rnn_units,
+        rnn_num=config.rnn_num,
+        rnn_dropout=config.rnn_dropout,
+        dense_units=config.dense_units,
+        dense_num=config.dense_num,
+        dense_dropout=config.dense_dropout
+    ).to(device)
+    elif config.model == 'gru':
+        model = GRU(config).to(device)
     else:
         print('Error, no model is fund')
 
-    model.summary()
+    print(model)
 
-    # Train
-    if args.mode == 'train':
-        trainer = Trainer(model, ds_train, ds_val, run_paths)
-        for _ in trainer.train():
-            continue
+    
+    trainer = Trainer(config, model, train_loader, test_loader)
+    trainer.train()
 
-    # Evaluation
-    else:
-         checkpoint = tf.train.Checkpoint(step=tf.Variable(0), model=model)
-            manager = tf.train.CheckpointManager(checkpoint,directory = args.checkpoint_file, max_to_keep=3)
-            checkpoint.restore(manager.latest_checkpoint)
-            if manager.latest_checkpoint:
-                tf.print("restore")
-            else:
-                tf.print("Error")
-        # Evaluation
-        evaluation = Eval(model, ds_test, run_paths)
-        if args.evaluation == 'evaluate':
-            evaluation.evaluate()
-        elif args.evaluation == 'confusionmatrix':
-            confusionmatrix(model, ds_test)
-        elif args.evaluation == 'visu.plot_visu':
-            evaluation.plot_visu(data_dir="/home/data/HAPT_dataset/RawData/")
-
+   
 
 if __name__ == "__main__":
-    app.run(main)
+    main()
 
