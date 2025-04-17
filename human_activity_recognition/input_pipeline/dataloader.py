@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from collections import Counter
+import json
 
 class HumanActivityDataset(Dataset):
     def __init__(self, data_dir, seq_length=100, stride=50, mode="train"):
@@ -26,6 +27,11 @@ class HumanActivityDataset(Dataset):
         labels_path = os.path.join(data_dir, "RawData", "labels.txt")
         self._parse_labels(labels_path, data_dir, users)
 
+    def standardize(self, data):
+        mean = np.mean(data, axis=0)
+        std = np.std(data, axis=0)
+        return (data - mean) / (std + 1e-6)
+
     def _parse_labels(self, labels_path, data_dir, users):
         """
         解析 labels.txt 并加载数据
@@ -45,6 +51,8 @@ class HumanActivityDataset(Dataset):
                 acc_path = os.path.join(data_dir, "RawData", f"acc_exp{exp_id:02d}_user{user_id:02d}.txt")
                 gyro_path = os.path.join(data_dir, "RawData", f"gyro_exp{exp_id:02d}_user{user_id:02d}.txt")
 
+                
+
                 if os.path.exists(acc_path) and os.path.exists(gyro_path):
                     acc_data = np.loadtxt(acc_path)  # shape: (num_samples, 3)
                     gyro_data = np.loadtxt(gyro_path)  # shape: (num_samples, 3)
@@ -52,6 +60,9 @@ class HumanActivityDataset(Dataset):
                     # 确保数据对齐
                     min_length = min(len(acc_data), len(gyro_data))
                     acc_data, gyro_data = acc_data[:min_length], gyro_data[:min_length]
+
+                    acc_data = self.standardize(acc_data)
+                    gyro_data = self.standardize(gyro_data)
 
                     # 拼接成 6D 数据 (加速度X,Y,Z + 角速度X,Y,Z)
                     full_data = np.hstack((acc_data, gyro_data))  # shape: (num_samples, 6)
@@ -70,6 +81,65 @@ class HumanActivityDataset(Dataset):
     def __getitem__(self, index):
         features, label = self.data[index]
         return torch.tensor(features, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
+
+
+class HumanActivityDataset_json(Dataset):
+    def __init__(self, data_dir, seq_length=64, stride=32, mode="train"):
+        """
+        data_dir: 数据存放的目录 (包含 RawData/)
+        seq_length: 每个时间序列样本的长度
+        stride: 滑动窗口步长
+        users: 选取的数据用户 (用于划分训练集和测试集)
+        """
+        self.seq_length = seq_length
+        self.stride = stride
+        self.data = []  # 存放 (样本, 标签)
+        self.mode = mode
+        self.label_dic = {"Walk":0, "Run": 1, "Sit":2 , "Lay":3, "Jump":4}
+        if self.mode == "train":
+            users = set(range(1, 26))
+        elif self.mode == "test":
+            users = set(range(26, 30))
+        else:
+            raise ValueError("Invalid mode. Must be 'train' or 'test'.")
+
+        self._parse_labels(data_dir)
+
+
+    def _parse_labels(self, data_dir):
+        """
+        解析 labels.txt 并加载数据
+        """
+        with open(data_dir, 'r', encoding='utf-8') as f:
+            datas = json.load(f)
+
+
+        for data in datas:
+            label = int(self.label_dic[data['label']])
+            motion = data['data']
+            acc = []
+            gyro = []
+            for point in motion:
+                acc.append((point['accX'], point['accY'], point['accZ']))
+                gyro.append((point['gyroX'], point['gyroY'], point['gyroZ']))
+
+            full_data = np.hstack((acc, gyro))  # shape: (num_samples, 6)
+
+            for i in range(0, len(full_data) - self.seq_length, self.stride):
+                sample = full_data[i:i + self.seq_length]  # 形状: (seq_length, 6)
+                self.data.append((sample, label))
+        
+    
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        features, label = self.data[index]
+
+        return torch.tensor(features, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
+
 
 
 def get_dataloaders(data_dir, batch_size=64, seq_length=100, stride=50):
@@ -96,3 +166,10 @@ def get_dataloaders(data_dir, batch_size=64, seq_length=100, stride=50):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, test_loader
+
+if __name__ == "__main__":
+    dataset = HumanActivityDataset_json(data_dir="/Users/tangwenwu/Documents/motion_data.json", seq_length=64, stride=32, mode='train')
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+    for x, y in dataloader:
+        print(x.shape, y.shape)  # 应该是 [32, 100, 6], [32]

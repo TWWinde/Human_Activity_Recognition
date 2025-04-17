@@ -14,18 +14,18 @@ def get_config():
     parser.add_argument('--model', type=str, default='lstm', choices=['lstm', 'gru'])
 
     parser.add_argument("--input_size", type=int, default=6, help="Feature input size")
-    parser.add_argument("--window_length", type=int, default=128, help="Input sequence length")
-    parser.add_argument("--rnn_units", type=int, default=128, help="Number of LSTM units")
-    parser.add_argument("--rnn_num", type=int, default=4, help="Number of LSTM layers")
+    parser.add_argument("--window_length", type=int, default=64, help="Input sequence length")
+    parser.add_argument("--rnn_units", type=int, default=64, help="Number of LSTM units")
+    parser.add_argument("--rnn_num", type=int, default=2, help="Number of LSTM layers")
     parser.add_argument("--rnn_dropout", type=float, default=0.3, help="Dropout rate for LSTM")
-    parser.add_argument("--dense_units", type=int, default=64, help="Dense layer units")
+    parser.add_argument("--dense_units", type=int, default=32, help="Dense layer units")
     parser.add_argument("--dense_num", type=int, default=1, help="Number of dense layers")
-    parser.add_argument("--dense_dropout", type=float, default=0.3, help="Dropout rate for dense layers")
-    parser.add_argument("--n_classes", type=int, default=12, help="Number of output classes")
+    parser.add_argument("--dense_dropout", type=float, default=0.1, help="Dropout rate for dense layers")
+    parser.add_argument("--n_classes", type=int, default=5, help="Number of output classes")
 
     # 训练参数
     parser.add_argument('--total_steps', type=int, default=8000)
-    parser.add_argument('--n_epochs', type=int, default=100)
+    parser.add_argument('--n_epochs', type=int, default=10000)
     parser.add_argument('--log_interval', type=int, default=20)
     parser.add_argument('--ckpt_interval', type=int, default=500)
     parser.add_argument('--loss_weight', type=float, default=1.0)
@@ -36,6 +36,7 @@ def get_config():
     parser.add_argument('--patch_size', type=int, default=64)
     parser.add_argument('--learning_rate', type=float, default=0.0001)
     parser.add_argument('--checkpoint_paths', type=str, default="/Users/tangwenwu/Documents/GitHub/Human_activity_recognition/human_activity_recognition/output/checkpoint")
+    parser.add_argument('--ct_model_paths', type=str, default="/Users/tangwenwu/Documents/GitHub/Human_activity_recognition/human_activity_recognition/output/ct_model")
     parser.add_argument('--device', type=str, default="cuda", choices=['cuda', 'cpu'])
 
     args = parser.parse_args()

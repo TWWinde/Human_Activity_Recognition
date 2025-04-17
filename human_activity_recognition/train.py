@@ -20,7 +20,8 @@ class Trainer:
         # 数据加载
         self.train_loader = train_loader
         self.val_loader = val_loader
-
+        print(f"训练集样本数量: {len(train_loader.dataset)}")
+        print(f"验证集样本数量: {len(val_loader.dataset)}")
         # 训练参数
         self.total_steps = config.total_steps
         self.epoch_steps = config.n_epochs
@@ -31,7 +32,7 @@ class Trainer:
 
         # 优化器 & 损失函数
         self.loss_object = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=config.learning_rate)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=config.learning_rate)
 
         # TensorBoard & Logging
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -105,7 +106,6 @@ class Trainer:
         # 计算准确率
         _, predicted = torch.max(predictions, 1)
         accuracy = (predicted == labels).float().mean().item()
-
         return loss.item(), accuracy
 
     def val_step(self, features, labels):
@@ -126,14 +126,15 @@ class Trainer:
         logging.info("\n================ Starting Training ================")
 
         step = self.start_step
+        train_loss, train_accuracy = 0.0, 0.0
         for epoch in range(self.start_epoch, self.epoch_steps + 1):
-            train_loss, train_accuracy = 0.0, 0.0
-
+            
             for features, labels in self.train_loader:
                 step += 1
                 loss, accuracy = self.train_step(features, labels)
                 train_loss += loss
                 train_accuracy += accuracy
+
 
                 # 日志记录
                 if step % self.log_interval == 0:
@@ -145,12 +146,11 @@ class Trainer:
 
                     val_loss /= len(self.val_loader)
                     val_accuracy /= len(self.val_loader)
-
                     logging.info(f"Epoch {epoch}, Step {step}, "
                                  f"Train Loss: {train_loss / self.log_interval:.4f}, "
-                                 f"Train Accuracy: {train_accuracy / self.log_interval:.2f}%, "
+                                 f"Train Accuracy: {train_accuracy * 100/ self.log_interval:.2f}%, "
                                  f"Val Loss: {val_loss:.4f}, "
-                                 f"Val Accuracy: {val_accuracy:.2f}%")
+                                 f"Val Accuracy: {val_accuracy*100:.2f}%")
 
                     # 重置训练损失 & 准确率
                     train_loss, train_accuracy = 0.0, 0.0
